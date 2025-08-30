@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tic-Tac-Toe Web App (Full Version)</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: linear-gradient(135deg, #2c3e50, #3498db);
+      color: #fff;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-template-rows: repeat(3, 100px);
+      gap: 5px;
+      margin-bottom: 20px;
+    }
+
+    .cell {
+      width: 100px;
+      height: 100px;
+      background: #34495e;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 2.5rem;
+      cursor: pointer;
+      border-radius: 10px;
+      transition: background 0.3s, transform 0.2s;
+    }
+
+    .cell:hover {
+      background: #3d566e;
+    }
+
+    .winner {
+      background: #2ecc71 !important;
+      color: #fff;
+      transform: scale(1.1);
+    }
+
+    .controls {
+      margin-bottom: 15px;
+    }
+
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background 0.3s;
+    }
+
+    .reset { background: #e74c3c; color: #fff; }
+    .mode { background: #27ae60; color: #fff; }
+    .play-again { background: #f39c12; color: #fff; display: none; }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    .status {
+      margin-top: 15px;
+      font-size: 1.2rem;
+    }
+
+    .scoreboard {
+      margin-top: 20px;
+      background: rgba(0,0,0,0.3);
+      padding: 15px 25px;
+      border-radius: 10px;
+      text-align: center;
+    }
+
+    .scoreboard h2 {
+      margin-bottom: 10px;
+    }
+
+    .scores {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      font-size: 1.1rem;
+    }
+
+    .scores div {
+      background: rgba(255,255,255,0.1);
+      padding: 8px 15px;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Tic-Tac-Toe</h1>
+
+  <div class="controls">
+    <button class="mode" id="toggleMode">Mode: 2 Players</button>
+    <button class="reset" id="resetBtn">Reset All</button>
+    <button class="play-again" id="playAgainBtn">Play Again</button>
+  </div>
+
+  <div class="board" id="board">
+    <div class="cell" data-index="0"></div>
+    <div class="cell" data-index="1"></div>
+    <div class="cell" data-index="2"></div>
+    <div class="cell" data-index="3"></div>
+    <div class="cell" data-index="4"></div>
+    <div class="cell" data-index="5"></div>
+    <div class="cell" data-index="6"></div>
+    <div class="cell" data-index="7"></div>
+    <div class="cell" data-index="8"></div>
+  </div>
+
+  <div class="status" id="status">Player X's Turn</div>
+
+  <!-- Scoreboard -->
+  <div class="scoreboard">
+    <h2>Scoreboard</h2>
+    <div class="scores">
+      <div>Player X: <span id="xScore">0</span></div>
+      <div>Player O: <span id="oScore">0</span></div>
+      <div>Draws: <span id="draws">0</span></div>
+    </div>
+  </div>
+
+  <!-- Sound Effects -->
+  <audio id="clickSound" src="https://assets.mixkit.co/sfx/preview/mixkit-game-click-1114.mp3"></audio>
+  <audio id="winSound" src="https://assets.mixkit.co/sfx/preview/mixkit-winning-chimes-2015.mp3"></audio>
+  <audio id="drawSound" src="https://assets.mixkit.co/sfx/preview/mixkit-retro-game-notification-212.mp3"></audio>
+
+  <script>
+    const board = document.getElementById("board");
+    const cells = document.querySelectorAll(".cell");
+    const status = document.getElementById("status");
+    const resetBtn = document.getElementById("resetBtn");
+    const toggleModeBtn = document.getElementById("toggleMode");
+    const playAgainBtn = document.getElementById("playAgainBtn");
+
+    // Scoreboard elements
+    const xScoreEl = document.getElementById("xScore");
+    const oScoreEl = document.getElementById("oScore");
+    const drawsEl = document.getElementById("draws");
+
+    // Sounds
+    const clickSound = document.getElementById("clickSound");
+    const winSound = document.getElementById("winSound");
+    const drawSound = document.getElementById("drawSound");
+
+    let currentPlayer = "X";
+    let gameActive = true;
+    let boardState = ["", "", "", "", "", "", "", "", ""];
+    let vsComputer = false;
+
+    let xScore = 0, oScore = 0, draws = 0;
+
+    const winningConditions = [
+      [0, 1, 2],
+      [3, 4, 5],
+      [6, 7, 8],
+      [0, 3, 6],
+      [1, 4, 7],
+      [2, 5, 8],
+      [0, 4, 8],
+      [2, 4, 6]
+    ];
+
+    function checkWinner(state) {
+      for (let condition of winningConditions) {
+        const [a, b, c] = condition;
+        if (state[a] && state[a] === state[b] && state[a] === state[c]) {
+          return { winner: state[a], line: condition };
+        }
+      }
+      if (!state.includes("")) return { winner: "draw", line: [] };
+      return null;
+    }
+
+    function handleClick(e) {
+      const index = e.target.dataset.index;
+      if (!gameActive || boardState[index] !== "") return;
+
+      boardState[index] = currentPlayer;
+      e.target.textContent = currentPlayer;
+
+      clickSound.play(); // play click sound
+
+      const result = checkWinner(boardState);
+      if (result) return endGame(result);
+
+      currentPlayer = currentPlayer === "X" ? "O" : "X";
+      status.textContent = `Player ${currentPlayer}'s Turn`;
+
+      if (vsComputer && currentPlayer === "O" && gameActive) {
+        setTimeout(computerMove, 400);
+      }
+    }
+
+    function computerMove() {
+      let bestScore = -Infinity;
+      let move;
+      boardState.forEach((cell, i) => {
+        if (cell === "") {
+          boardState[i] = "O";
+          let score = minimax(boardState, 0, false);
+          boardState[i] = "";
+          if (score > bestScore) {
+            bestScore = score;
+            move = i;
+          }
+        }
+      });
+
+      boardState[move] = "O";
+      cells[move].textContent = "O";
+
+      clickSound.play(); // AI move click sound
+
+      const result = checkWinner(boardState);
+      if (result) return endGame(result);
+
+      currentPlayer = "X";
+      status.textContent = `Player ${currentPlayer}'s Turn`;
+    }
+
+    function minimax(state, depth, isMaximizing) {
+      let result = checkWinner(state);
+      if (result !== null) {
+        if (result.winner === "O") return 10 - depth;
+        if (result.winner === "X") return depth - 10;
+        return 0;
+      }
+
+      if (isMaximizing) {
+        let bestScore = -Infinity;
+        state.forEach((cell, i) => {
+          if (cell === "") {
+            state[i] = "O";
+            let score = minimax(state, depth + 1, false);
+            state[i] = "";
+            bestScore = Math.max(score, bestScore);
+          }
+        });
+        return bestScore;
+      } else {
+        let bestScore = Infinity;
+        state.forEach((cell, i) => {
+          if (cell === "") {
+            state[i] = "X";
+            let score = minimax(state, depth + 1, true);
+            state[i] = "";
+            bestScore = Math.min(score, bestScore);
+          }
+        });
+        return bestScore;
+      }
+    }
+
+    function endGame(result) {
+      gameActive = false;
+      playAgainBtn.style.display = "inline-block";
+
+      if (result.winner === "draw") {
+        status.textContent = "It's a Draw! 🤝";
+        drawSound.play();
+        draws++;
+        drawsEl.textContent = draws;
+      } else {
+        status.textContent = `Player ${result.winner} Wins! 🎉`;
+        winSound.play();
+
+        result.line.forEach(i => cells[i].classList.add("winner"));
+
+        if (result.winner === "X") {
+          xScore++;
+          xScoreEl.textContent = xScore;
+        } else {
+          oScore++;
+          oScoreEl.textContent = oScore;
+        }
+      }
+    }
+
+    function resetBoard() {
+      currentPlayer = "X";
+      gameActive = true;
+      boardState = ["", "", "", "", "", "", "", "", ""];
+      cells.forEach(cell => {
+        cell.textContent = "";
+        cell.classList.remove("winner");
+      });
+      status.textContent = "Player X's Turn";
+      playAgainBtn.style.display = "none";
+    }
+
+    function resetAll() {
+      resetBoard();
+      xScore = 0; oScore = 0; draws = 0;
+      xScoreEl.textContent = "0";
+      oScoreEl.textContent = "0";
+      drawsEl.textContent = "0";
+    }
+
+    function toggleMode() {
+      vsComputer = !vsComputer;
+      toggleModeBtn.textContent = vsComputer ? "Mode: Vs Computer (Unbeatable)" : "Mode: 2 Players";
+      resetAll();
+    }
+
+    cells.forEach(cell => cell.addEventListener("click", handleClick));
+    resetBtn.addEventListener("click", resetAll);
+    playAgainBtn.addEventListener("click", resetBoard);
+    toggleModeBtn.addEventListener("click", toggleMode);
+  </script>
+
+</body>
+</html>
